@@ -16,10 +16,10 @@ class Command(BaseCommand):
         competitions = Competition.objects.all()
 
         for comp in competitions:
-            self.stdout.write(f"Syncing {comp.name}...")
+            self.stdout.write(self.style.WARNING(f"\n--- Syncing {comp.name} ---"))
             sync_teams(comp, season_year=2025)
             sync_fixtures(comp, season, season_year=2025)
 
         sync_results()
 
-        self.stdout.write(self.style.SUCCESS("Full sync complete"))
+        self.stdout.write(self.style.SUCCESS("\nFull sync complete"))
