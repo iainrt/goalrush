@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.db.models import Count
 
 from .models import Pick
-from users.models import LeagueMembership
+from competitions.models import LeagueMembership
 from gameweeks.models import Gameweek
 from matches.models import Match
 
