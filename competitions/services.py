@@ -1,37 +1,48 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
-
-from .models import LeagueInvite, LeagueMembership
+from .models import League, LeagueMembership
+import uuid
 
 
 class LeagueService:
 
     @staticmethod
     @transaction.atomic
-    def join_league_by_code(*, user, code: str):
+    def join_league_by_join_code(*, user, join_code: str):
 
-        try:
-            invite = LeagueInvite.objects.select_for_update().get(code=code)
-        except LeagueInvite.DoesNotExist:
-            raise ValidationError("Invalid invite code.")
+        join_code = (join_code or "").strip().upper()
+        if not join_code:
+            raise ValidationError("Join code is required.")
 
-        if not invite.is_valid():
-            raise ValidationError("Invite expired or fully used.")
+        league = League.objects.select_for_update().filter(join_code=join_code).first()
+        if not league:
+            raise ValidationError("Invalid join code.")
 
-        league = invite.league
+        if league.is_locked:
+            raise ValidationError("This league is locked and cannot accept new members.")
 
-        # Prevent duplicate membership
+        # Prevent duplicates
         if LeagueMembership.objects.filter(user=user, league=league).exists():
             raise ValidationError("You are already a member of this league.")
 
-        # Create membership
         LeagueMembership.objects.create(
             user=user,
             league=league,
             role="member"
         )
 
-        # Increment usage safely
-        invite.increment_use()
-
         return league
+    
+    @staticmethod
+    @transaction.atomic
+    def regenerate_join_code(*, user, league):
+        # only league admins
+        if not LeagueMembership.objects.filter(user=user, league=league, role="admin").exists():
+            raise ValidationError("Only league admins can regenerate the join code.")
+
+        while True:
+            code = uuid.uuid4().hex[:10].upper()
+            if not League.objects.filter(join_code=code).exists():
+                league.join_code = code
+                league.save(update_fields=["join_code"])
+                return league.join_code

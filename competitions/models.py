@@ -40,6 +40,7 @@ class League(models.Model):
 
     join_code = models.CharField(max_length=12, unique=True, blank=True)
     is_public = models.BooleanField(default=False)
+    is_locked = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -63,7 +64,11 @@ class League(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.join_code:
-            self.join_code = self._generate_join_code()
+            while True:
+                code = self._generate_join_code()
+                if not League.objects.filter(join_code=code).exists():
+                    self.join_code = code
+                    break
 
         is_new = self.pk is None
         super().save(*args, **kwargs)
@@ -99,29 +104,3 @@ class LeagueMembership(models.Model):
     def __str__(self):
         return f"{self.user} in {self.league.name}"
     
-class LeagueInvite(models.Model):
-    league = models.ForeignKey(
-        League,
-        on_delete=models.CASCADE,
-        related_name="invites"
-    )
-
-    code = models.CharField(max_length=12, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    expires_at = models.DateTimeField()
-    max_uses = models.PositiveIntegerField(default=1)
-    uses = models.PositiveIntegerField(default=0)
-
-    def is_valid(self):
-        return (
-            self.uses < self.max_uses and
-            timezone.now() < self.expires_at
-        )
-
-    def increment_use(self):
-        self.uses += 1
-        self.save(update_fields=["uses"])
-
-    def __str__(self):
-        return f"Invite for {self.league.name}"

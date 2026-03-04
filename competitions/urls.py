@@ -1,6 +1,6 @@
 from django.urls import path
-from .views import join_league_view
+from .views import join_league
 
 urlpatterns = [
-    path("leagues/join/<str:code>/", join_league_view, name="join_league"),
+    path("leagues/join/", join_league, name="join_league"),
 ]
