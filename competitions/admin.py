@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Season, Competition, League, LeagueMembership
+from .models import Season, Competition, League, LeagueMembership, LeagueInvite
 
 
 class LeagueMembershipInline(admin.TabularInline):
@@ -33,3 +33,10 @@ class SeasonAdmin(admin.ModelAdmin):
 class CompetitionAdmin(admin.ModelAdmin):
     list_display = ("name", "country", "api_league_id")
     search_fields = ("name", "country")
+
+
+@admin.register(LeagueInvite)
+class LeagueInviteAdmin(admin.ModelAdmin):
+    list_display = ("league", "code", "expires_at", "max_uses", "uses")
+    list_filter = ("league",)
+    autocomplete_fields = ("league",)

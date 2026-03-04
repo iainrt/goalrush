@@ -1,5 +1,7 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
+from datetime import timedelta
 import uuid
 
 User = settings.AUTH_USER_MODEL
@@ -96,3 +98,30 @@ class LeagueMembership(models.Model):
 
     def __str__(self):
         return f"{self.user} in {self.league.name}"
+    
+class LeagueInvite(models.Model):
+    league = models.ForeignKey(
+        League,
+        on_delete=models.CASCADE,
+        related_name="invites"
+    )
+
+    code = models.CharField(max_length=12, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    expires_at = models.DateTimeField()
+    max_uses = models.PositiveIntegerField(default=1)
+    uses = models.PositiveIntegerField(default=0)
+
+    def is_valid(self):
+        return (
+            self.uses < self.max_uses and
+            timezone.now() < self.expires_at
+        )
+
+    def increment_use(self):
+        self.uses += 1
+        self.save(update_fields=["uses"])
+
+    def __str__(self):
+        return f"Invite for {self.league.name}"
