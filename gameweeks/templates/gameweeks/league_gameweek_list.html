@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Gameweeks{% endblock %}
+{% block content %}
+  <h1>{{ league.name }} — Gameweeks</h1>
+
+  {% if is_admin %}
+    <div style="margin-bottom:12px;">
+      <a class="btn" href="{% url 'league_gameweek_create' league.id %}">Create gameweek</a>
+    </div>
+  {% endif %}
+
+  <div class="card">
+    {% for gw in gameweeks %}
+      <div style="padding:8px 0;border-bottom:1px solid #f1f1f1;">
+        <div>
+          <strong>{{ gw.name }}</strong>
+          <span class="muted">
+            {% if gw.published %}Published{% else %}Draft{% endif %} ·
+            {% if gw.locked %}Locked{% else %}Open{% endif %}
+          </span>
+        </div>
+        <div class="muted">
+          {{ gw.start_date }} to {{ gw.end_date }}
+        </div>
+        <div class="muted">
+          Competitions:
+          {% for competition in gw.competitions.all %}
+            {{ competition.name }}{% if not forloop.last %}, {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    {% empty %}
+      <p>No gameweeks created yet.</p>
+    {% endfor %}
+  </div>
+{% endblock %}

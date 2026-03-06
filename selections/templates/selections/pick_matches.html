@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Pick matches{% endblock %}
+{% block content %}
+  <h1>{{ league.name }} - Picks</h1>
+  <p class="muted">{{ gameweek.name }} · {{ league.season.name }}</p>
+
+  <div class="card">
+    <div><strong>Gameweek window:</strong> {{ gameweek.start_date }} to {{ gameweek.end_date }}</div>
+    <div class="muted">
+      Competitions:
+      {% for competition in gameweek.competitions.all %}
+        {{ competition.name }}{% if not forloop.last %}, {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <h2>Your picks</h2>
+  <div class="card">
+    {% for pick in user_picks %}
+      <div>
+        {{ pick.match.home_team.name }} vs {{ pick.match.away_team.name }}
+        <span class="muted">({{ pick.result_status }})</span>
+      </div>
+    {% empty %}
+      <p>You have not submitted picks yet.</p>
+    {% endfor %}
+  </div>
+
+  {% if not user_picks %}
+    <h2>Available matches</h2>
+    <div class="card">
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn" type="submit">Submit 2 picks</button>
+      </form>
+    </div>
+  {% endif %}
+
+  <h2>Other users' picks</h2>
+  <div class="card">
+    {% for pick in other_picks %}
+      <div style="padding:6px 0;border-bottom:1px solid #f1f1f1;">
+        <strong>{{ pick.user.username }}</strong>
+        — {{ pick.match.home_team.name }} vs {{ pick.match.away_team.name }}
+      </div>
+    {% empty %}
+      <p>No other picks yet.</p>
+    {% endfor %}
+  </div>
+{% endblock %}
