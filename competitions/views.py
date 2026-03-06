@@ -1,27 +1,107 @@
-from django.shortcuts import render, redirect
 from django.contrib import messages
-from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.shortcuts import get_object_or_404, redirect, render
+from django.db.models import Count
 
-from .forms import JoinLeagueForm
+from .forms import JoinLeagueForm, LeagueCreateForm
+from .models import League, LeagueMembership
 from .services import LeagueService
+
+from gameweeks.models import Gameweek
+from selections.models import Pick
 
 
 @login_required
 def join_league(request):
-    if request.method == "POST":
-        form = JoinLeagueForm(request.POST)
-        if form.is_valid():
-            try:
-                league = LeagueService.join_league_by_join_code(
-                    user=request.user,
-                    join_code=form.cleaned_data["join_code"]
-                )
-                messages.success(request, f"You joined {league.name}")
-                return redirect("league_detail", league_id=league.id)
-            except ValidationError as e:
-                messages.error(request, str(e))
-    else:
-        form = JoinLeagueForm()
+    form = JoinLeagueForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        join_code = form.cleaned_data["join_code"]
+        try:
+            league = LeagueService.join_league_by_join_code(user=request.user, join_code=join_code)
+            messages.success(request, f"You joined: {league.name}")
+            return redirect("league_detail", league_id=league.id)
+        except ValidationError as e:
+            messages.error(request, e.message)
 
     return render(request, "competitions/join_league.html", {"form": form})
+
+
+@login_required
+def league_list(request):
+    # Leagues where user is a member
+    leagues = (
+        League.objects
+        .filter(memberships__user=request.user)
+        .select_related("season", "competition", "created_by")
+        .annotate(member_count=Count("memberships", distinct=True))
+        .order_by("-created_at")
+    )
+
+    return render(request, "competitions/league_list.html", {"leagues": leagues})
+
+
+@login_required
+def league_create(request):
+    form = LeagueCreateForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        league = form.save(commit=False)
+        league.created_by = request.user
+        league.save()  # your League.save() auto-creates admin membership
+        messages.success(request, f"League created: {league.name}")
+        return redirect("league_detail", league_id=league.id)
+
+    return render(request, "competitions/league_create.html", {"form": form})
+
+
+@login_required
+def league_detail(request, league_id: int):
+    league = get_object_or_404(
+        League.objects.select_related("season", "competition", "created_by"),
+        id=league_id,
+    )
+
+    membership = LeagueMembership.objects.filter(user=request.user, league=league).first()
+    if not membership:
+        raise PermissionDenied("You are not a member of this league.")
+
+    is_admin = membership.role == "admin"
+
+    members = (
+        LeagueMembership.objects
+        .filter(league=league)
+        .select_related("user")
+        .order_by("-role", "joined_at")
+    )
+
+    # Show picks for latest published gameweek (for this league’s season+competition)
+    latest_gw = (
+        Gameweek.objects
+        .filter(season=league.season, competition=league.competition, published=True)
+        .order_by("-start_date")
+        .first()
+    )
+
+    picks = []
+    if latest_gw:
+        picks = (
+            Pick.objects
+            .filter(league=league, gameweek=latest_gw)
+            .select_related("user", "match", "match__home_team", "match__away_team")
+            .order_by("created_at")
+        )
+
+    return render(
+        request,
+        "competitions/league_detail.html",
+        {
+            "league": league,
+            "membership": membership,
+            "is_admin": is_admin,
+            "members": members,
+            "latest_gw": latest_gw,
+            "picks": picks,
+        },
+    )

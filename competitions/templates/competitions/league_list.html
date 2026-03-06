@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Your leagues{% endblock %}
+{% block content %}
+  <h1>Your leagues</h1>
+  <p class="muted">Leagues you’ve joined.</p>
+
+  <div class="row">
+    <a class="btn" href="/leagues/create/">+ Create league</a>
+    <a class="btn" href="/leagues/join/">Join via code</a>
+  </div>
+
+  <hr style="border:none;border-top:1px solid #eee;margin:16px 0;" />
+
+  {% for league in leagues %}
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
+        <div>
+          <div><strong>{{ league.name }}</strong></div>
+          <div class="muted">{{ league.competition.name }} · {{ league.season.name }} · {{ league.member_count }} members</div>
+        </div>
+        <div>
+          <a class="btn" href="/leagues/{{ league.id }}/">Open</a>
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="card">
+      <p>You’re not in any leagues yet.</p>
+    </div>
+  {% endfor %}
+{% endblock %}

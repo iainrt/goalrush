@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Create league{% endblock %}
+{% block content %}
+  <h1>Create league</h1>
+
+  <div class="card">
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button class="btn" type="submit">Create</button>
+    </form>
+  </div>
+{% endblock %}
