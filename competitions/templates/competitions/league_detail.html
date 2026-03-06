@@ -10,14 +10,46 @@
       {% if league.is_locked %}Locked{% else %}Open{% endif %} ·
       {% if league.is_public %}Public{% else %}Private{% endif %}
     </div>
+
+    {% if is_admin %}
+      <div style="margin-top:12px;">
+        {% if league.is_locked %}
+          <form method="post" action="{% url 'league_unlock' league.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button class="btn" type="submit">Unlock league</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'league_lock' league.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button class="btn" type="submit">Lock league</button>
+          </form>
+        {% endif %}
+
+        <form method="post" action="{% url 'league_regenerate_code' league.id %}" style="display:inline;">
+          {% csrf_token %}
+          <button class="btn" type="submit">Regenerate join code</button>
+        </form>
+      </div>
+    {% endif %}
   </div>
 
   <h2>Members</h2>
   <div class="card">
     {% for m in members %}
       <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #f1f1f1;">
-        <div>{{ m.user.username }}</div>
-        <div class="muted">{{ m.role }}</div>
+        <div>
+          {{ m.user.username }}
+          <span class="muted">({{ m.role }})</span>
+        </div>
+
+        <div>
+          {% if is_admin and m.user_id != request.user.id %}
+            <form method="post" action="{% url 'league_remove_member' league.id m.user_id %}" style="display:inline;">
+              {% csrf_token %}
+              <button class="btn" type="submit">Remove</button>
+            </form>
+          {% endif %}
+        </div>
       </div>
     {% empty %}
       <p>No members yet.</p>

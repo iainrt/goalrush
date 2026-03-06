@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.db.models import Count
+from django.views.decorators.http import require_POST
 
 from .forms import JoinLeagueForm, LeagueCreateForm
 from .models import League, LeagueMembership
@@ -105,3 +106,39 @@ def league_detail(request, league_id: int):
             "picks": picks,
         },
     )
+
+@login_required
+@require_POST
+def league_lock(request, league_id):
+    try:
+        league = LeagueService.lock_league(user=request.user, league_id=league_id)
+        messages.success(request, f"{league.name} is now locked.")
+    except (PermissionDenied, ValidationError) as e:
+        messages.error(request, str(e))
+    return redirect("league_detail", league_id=league_id)
+
+
+@login_required
+@require_POST
+def league_unlock(request, league_id):
+    try:
+        league = LeagueService.unlock_league(user=request.user, league_id=league_id)
+        messages.success(request, f"{league.name} is now unlocked.")
+    except (PermissionDenied, ValidationError) as e:
+        messages.error(request, str(e))
+    return redirect("league_detail", league_id=league_id)
+
+
+@login_required
+@require_POST
+def league_remove_member(request, league_id, user_id):
+    try:
+        LeagueService.remove_member(
+            user=request.user,
+            league_id=league_id,
+            member_user_id=user_id,
+        )
+        messages.success(request, "Member removed.")
+    except (PermissionDenied, ValidationError) as e:
+        messages.error(request, str(e))
+    return redirect("league_detail", league_id=league_id)
