@@ -11,22 +11,56 @@
 
   <div class="card">
     {% for gw in gameweeks %}
-      <div style="padding:8px 0;border-bottom:1px solid #f1f1f1;">
-        <div>
-          <strong>{{ gw.name }}</strong>
-          <span class="muted">
-            {% if gw.published %}Published{% else %}Draft{% endif %} ·
-            {% if gw.locked %}Locked{% else %}Open{% endif %}
-          </span>
-        </div>
-        <div class="muted">
-          {{ gw.start_date }} to {{ gw.end_date }}
-        </div>
-        <div class="muted">
-          Competitions:
-          {% for competition in gw.competitions.all %}
-            {{ competition.name }}{% if not forloop.last %}, {% endif %}
-          {% endfor %}
+      <div style="padding:12px 0;border-bottom:1px solid #f1f1f1;">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+          <div>
+            <div>
+              <strong>{{ gw.name }}</strong>
+              <span class="muted">
+                {% if gw.published %}Published{% else %}Draft{% endif %} ·
+                {% if gw.locked %}Locked{% else %}Open{% endif %}
+              </span>
+            </div>
+            <div class="muted">{{ gw.start_date }} to {{ gw.end_date }}</div>
+            <div class="muted">
+              Competitions:
+              {% for competition in gw.competitions.all %}
+                {{ competition.name }}{% if not forloop.last %}, {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+
+          {% if is_admin %}
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              {% if not gw.locked %}
+                <a class="btn" href="{% url 'league_gameweek_edit' league.id gw.id %}">Edit</a>
+              {% endif %}
+
+              {% if gw.published %}
+                <form method="post" action="{% url 'league_gameweek_unpublish' league.id gw.id %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button class="btn" type="submit">Unpublish</button>
+                </form>
+              {% else %}
+                <form method="post" action="{% url 'league_gameweek_publish' league.id gw.id %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button class="btn" type="submit">Publish</button>
+                </form>
+              {% endif %}
+
+              {% if gw.locked %}
+                <form method="post" action="{% url 'league_gameweek_unlock' league.id gw.id %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button class="btn" type="submit">Unlock</button>
+                </form>
+              {% else %}
+                <form method="post" action="{% url 'league_gameweek_lock' league.id gw.id %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button class="btn" type="submit">Lock</button>
+                </form>
+              {% endif %}
+            </div>
+          {% endif %}
         </div>
       </div>
     {% empty %}

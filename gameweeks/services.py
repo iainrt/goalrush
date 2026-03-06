@@ -39,7 +39,7 @@ class GameweekService:
             raise ValidationError("Start date must be before end date.")
 
         if lock_time and lock_time > start_date:
-            raise ValidationError("Lock time should be on or before the first fixture window start.")
+            raise ValidationError("Lock time should be on or before the gameweek start.")
 
         gameweek = Gameweek.objects.create(
             league=league,
@@ -53,5 +53,78 @@ class GameweekService:
             locked=locked,
         )
         gameweek.competitions.set(competitions)
+        return gameweek
 
+    @staticmethod
+    @transaction.atomic
+    def update_gameweek(
+        *,
+        user,
+        gameweek,
+        name,
+        number,
+        competitions,
+        start_date,
+        end_date,
+        lock_time,
+        published,
+        locked,
+    ):
+        GameweekService._require_league_admin(user=user, league=gameweek.league)
+
+        if gameweek.locked:
+            raise ValidationError("Locked gameweeks cannot be edited. Unlock the gameweek first.")
+
+        if start_date >= end_date:
+            raise ValidationError("Start date must be before end date.")
+
+        if lock_time and lock_time > start_date:
+            raise ValidationError("Lock time should be on or before the gameweek start.")
+
+        gameweek.name = name
+        gameweek.number = number
+        gameweek.start_date = start_date
+        gameweek.end_date = end_date
+        gameweek.lock_time = lock_time
+        gameweek.published = published
+        gameweek.locked = locked
+        gameweek.save()
+
+        gameweek.competitions.set(competitions)
+        return gameweek
+
+    @staticmethod
+    @transaction.atomic
+    def publish_gameweek(*, user, gameweek):
+        GameweekService._require_league_admin(user=user, league=gameweek.league)
+        if not gameweek.published:
+            gameweek.published = True
+            gameweek.save(update_fields=["published"])
+        return gameweek
+
+    @staticmethod
+    @transaction.atomic
+    def unpublish_gameweek(*, user, gameweek):
+        GameweekService._require_league_admin(user=user, league=gameweek.league)
+        if gameweek.published:
+            gameweek.published = False
+            gameweek.save(update_fields=["published"])
+        return gameweek
+
+    @staticmethod
+    @transaction.atomic
+    def lock_gameweek(*, user, gameweek):
+        GameweekService._require_league_admin(user=user, league=gameweek.league)
+        if not gameweek.locked:
+            gameweek.locked = True
+            gameweek.save(update_fields=["locked"])
+        return gameweek
+
+    @staticmethod
+    @transaction.atomic
+    def unlock_gameweek(*, user, gameweek):
+        GameweekService._require_league_admin(user=user, league=gameweek.league)
+        if gameweek.locked:
+            gameweek.locked = False
+            gameweek.save(update_fields=["locked"])
         return gameweek

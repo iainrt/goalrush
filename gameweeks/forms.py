@@ -32,3 +32,4 @@ class GameweekCreateForm(forms.ModelForm):
 
         if league:
             self.fields["season"].initial = league.season
+            self.fields["season"].disabled = True

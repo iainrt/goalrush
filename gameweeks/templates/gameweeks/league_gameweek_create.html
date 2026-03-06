@@ -1,14 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Create gameweek{% endblock %}
+{% block title %}{% if is_edit %}Edit gameweek{% else %}Create gameweek{% endif %}{% endblock %}
 {% block content %}
-  <h1>Create gameweek</h1>
+  <h1>{% if is_edit %}Edit gameweek{% else %}Create gameweek{% endif %}</h1>
   <p class="muted">{{ league.name }} · {{ league.season.name }}</p>
 
   <div class="card">
     <form method="post">
       {% csrf_token %}
       {{ form.as_p }}
-      <button class="btn" type="submit">Create gameweek</button>
+      <button class="btn" type="submit">
+        {% if is_edit %}Save changes{% else %}Create gameweek{% endif %}
+      </button>
     </form>
   </div>
 {% endblock %}
