@@ -1,7 +1,5 @@
 from django.conf import settings
 from django.db import models
-from django.utils import timezone
-from datetime import timedelta
 import uuid
 
 User = settings.AUTH_USER_MODEL
@@ -24,13 +22,9 @@ class Competition(models.Model):
         return f"{self.name} ({self.country})"
 
 
-# =========================
-# User League (social league)
-# =========================
 class League(models.Model):
     name = models.CharField(max_length=120)
     season = models.ForeignKey(Season, on_delete=models.CASCADE)
-    competition = models.ForeignKey(Competition, on_delete=models.CASCADE)
 
     created_by = models.ForeignKey(
         User,
@@ -46,18 +40,18 @@ class League(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["season", "competition"]),
+            models.Index(fields=["season"]),
             models.Index(fields=["join_code"]),
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["name", "season", "competition"],
-                name="unique_league_per_season_competition"
+                fields=["name", "season"],
+                name="unique_league_per_season"
             )
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.competition.name})"
+        return self.name
 
     def _generate_join_code(self):
         return uuid.uuid4().hex[:10].upper()
@@ -82,7 +76,6 @@ class League(models.Model):
 
 
 class LeagueMembership(models.Model):
-
     ROLE_CHOICES = [
         ("admin", "Admin"),
         ("member", "Member"),
@@ -103,4 +96,3 @@ class LeagueMembership(models.Model):
 
     def __str__(self):
         return f"{self.user} in {self.league.name}"
-    

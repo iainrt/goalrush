@@ -20,22 +20,24 @@ def join_league(request):
     if request.method == "POST" and form.is_valid():
         join_code = form.cleaned_data["join_code"]
         try:
-            league = LeagueService.join_league_by_join_code(user=request.user, join_code=join_code)
+            league = LeagueService.join_league_by_join_code(
+                user=request.user,
+                join_code=join_code
+            )
             messages.success(request, f"You joined: {league.name}")
             return redirect("league_detail", league_id=league.id)
         except ValidationError as e:
-            messages.error(request, e.message)
+            messages.error(request, str(e))
 
     return render(request, "competitions/join_league.html", {"form": form})
 
 
 @login_required
 def league_list(request):
-    # Leagues where user is a member
     leagues = (
         League.objects
         .filter(memberships__user=request.user)
-        .select_related("season", "competition", "created_by")
+        .select_related("season", "created_by")
         .annotate(member_count=Count("memberships", distinct=True))
         .order_by("-created_at")
     )
@@ -50,7 +52,7 @@ def league_create(request):
     if request.method == "POST" and form.is_valid():
         league = form.save(commit=False)
         league.created_by = request.user
-        league.save()  # your League.save() auto-creates admin membership
+        league.save()
         messages.success(request, f"League created: {league.name}")
         return redirect("league_detail", league_id=league.id)
 
@@ -60,7 +62,7 @@ def league_create(request):
 @login_required
 def league_detail(request, league_id: int):
     league = get_object_or_404(
-        League.objects.select_related("season", "competition", "created_by"),
+        League.objects.select_related("season", "created_by"),
         id=league_id,
     )
 
@@ -77,10 +79,10 @@ def league_detail(request, league_id: int):
         .order_by("-role", "joined_at")
     )
 
-    # Show picks for latest published gameweek (for this league’s season+competition)
     latest_gw = (
         Gameweek.objects
-        .filter(season=league.season, competition=league.competition, published=True)
+        .filter(league=league, published=True)
+        .prefetch_related("competitions")
         .order_by("-start_date")
         .first()
     )
@@ -106,6 +108,7 @@ def league_detail(request, league_id: int):
             "picks": picks,
         },
     )
+
 
 @login_required
 @require_POST
@@ -141,4 +144,19 @@ def league_remove_member(request, league_id, user_id):
         messages.success(request, "Member removed.")
     except (PermissionDenied, ValidationError) as e:
         messages.error(request, str(e))
+    return redirect("league_detail", league_id=league_id)
+
+
+@login_required
+@require_POST
+def league_regenerate_code(request, league_id):
+    try:
+        new_code = LeagueService.regenerate_join_code(
+            user=request.user,
+            league_id=league_id,
+        )
+        messages.success(request, f"New join code: {new_code}")
+    except (PermissionDenied, ValidationError) as e:
+        messages.error(request, str(e))
+
     return redirect("league_detail", league_id=league_id)

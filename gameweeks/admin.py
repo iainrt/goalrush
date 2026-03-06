@@ -6,7 +6,7 @@ from .models import Gameweek
 class GameweekAdmin(admin.ModelAdmin):
     list_display = (
         "name",
-        "competition",
+        "league",
         "season",
         "start_date",
         "end_date",
@@ -14,13 +14,8 @@ class GameweekAdmin(admin.ModelAdmin):
         "published",
         "locked",
     )
-
     list_editable = ("published", "locked")
-
-    list_filter = ("season", "competition", "published", "locked")
-
-    ordering = ("competition", "start_date")
-
-    search_fields = ("name",)
-
+    list_filter = ("season", "league", "published", "locked")
+    search_fields = ("name", "league__name")
+    filter_horizontal = ("competitions",)
     readonly_fields = ("created_at",)

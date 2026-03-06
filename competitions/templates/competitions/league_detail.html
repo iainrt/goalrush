@@ -2,7 +2,7 @@
 {% block title %}{{ league.name }}{% endblock %}
 {% block content %}
   <h1>{{ league.name }}</h1>
-  <p class="muted">{{ league.competition.name }} · {{ league.season.name }}</p>
+  <p class="muted">{{ league.season.name }}</p>
 
   <div class="card">
     <div><strong>Join code:</strong> {{ league.join_code }}</div>
@@ -57,8 +57,15 @@
   </div>
 
   <h2>Picks</h2>
+
   {% if latest_gw %}
     <p class="muted">Latest published gameweek: <strong>{{ latest_gw.name }}</strong></p>
+    <p class="muted">
+      Competitions:
+      {% for competition in latest_gw.competitions.all %}
+        {{ competition.name }}{% if not forloop.last %}, {% endif %}
+      {% endfor %}
+    </p>
     <div class="card">
       {% for p in picks %}
         <div style="padding:6px 0;border-bottom:1px solid #f1f1f1;">
