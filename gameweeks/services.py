@@ -97,34 +97,54 @@ class GameweekService:
     @transaction.atomic
     def publish_gameweek(*, user, gameweek):
         GameweekService._require_league_admin(user=user, league=gameweek.league)
+
+        conflicting_gameweek = (
+            Gameweek.objects
+            .filter(
+                league=gameweek.league,
+                published=True,
+                locked=False,
+            )
+            .exclude(id=gameweek.id)
+            .first()
+        )
+
+        if conflicting_gameweek:
+            raise ValidationError(
+                f"Cannot publish {gameweek.name}. "
+                f"{conflicting_gameweek.name} is already published and unlocked for this league."
+            )
+
         if not gameweek.published:
             gameweek.published = True
             gameweek.save(update_fields=["published"])
-        return gameweek
 
-    @staticmethod
-    @transaction.atomic
-    def unpublish_gameweek(*, user, gameweek):
-        GameweekService._require_league_admin(user=user, league=gameweek.league)
-        if gameweek.published:
-            gameweek.published = False
-            gameweek.save(update_fields=["published"])
-        return gameweek
-
-    @staticmethod
-    @transaction.atomic
-    def lock_gameweek(*, user, gameweek):
-        GameweekService._require_league_admin(user=user, league=gameweek.league)
-        if not gameweek.locked:
-            gameweek.locked = True
-            gameweek.save(update_fields=["locked"])
         return gameweek
 
     @staticmethod
     @transaction.atomic
     def unlock_gameweek(*, user, gameweek):
         GameweekService._require_league_admin(user=user, league=gameweek.league)
+
+        conflicting_gameweek = (
+            Gameweek.objects
+            .filter(
+                league=gameweek.league,
+                published=True,
+                locked=False,
+            )
+            .exclude(id=gameweek.id)
+            .first()
+        )
+
+        if conflicting_gameweek:
+            raise ValidationError(
+                f"Cannot unlock {gameweek.name}. "
+                f"{conflicting_gameweek.name} is already published and unlocked for this league."
+            )
+
         if gameweek.locked:
             gameweek.locked = False
             gameweek.save(update_fields=["locked"])
+
         return gameweek

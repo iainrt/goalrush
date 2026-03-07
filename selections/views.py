@@ -21,21 +21,25 @@ def pick_matches(request, league_id):
 
     gameweek = (
         Gameweek.objects
-        .filter(league=league, published=True, locked=False)
+        .filter(
+            league=league,
+            published=True,
+            locked=False,
+        )
         .prefetch_related("competitions")
-        .order_by("start_date")
+        .order_by("-start_date")
         .first()
     )
 
     if not gameweek:
-        messages.error(request, "No open published gameweek is available for this league.")
+        messages.error(request, "No published and unlocked gameweek is available for this league.")
         return redirect("league_detail", league_id=league.id)
 
-    user_picks = Pick.objects.filter(
-        user=request.user,
-        league=league,
-        gameweek=gameweek,
-    ).select_related("match", "match__home_team", "match__away_team")
+    user_picks = (
+        Pick.objects
+        .filter(user=request.user, league=league, gameweek=gameweek)
+        .select_related("match", "match__home_team", "match__away_team")
+    )
 
     taken_match_ids = Pick.objects.filter(
         league=league,

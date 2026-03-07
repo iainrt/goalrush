@@ -25,6 +25,17 @@ def league_gameweek_list(request, league_id):
         .order_by("-start_date")
     )
 
+    active_open_gameweek = (
+        Gameweek.objects
+        .filter(
+            league=league,
+            published=True,
+            locked=False,
+        )
+        .order_by("-start_date")
+        .first()
+    )
+
     return render(
         request,
         "gameweeks/league_gameweek_list.html",
@@ -32,6 +43,7 @@ def league_gameweek_list(request, league_id):
             "league": league,
             "gameweeks": gameweeks,
             "is_admin": membership.role == "admin",
+            "active_open_gameweek": active_open_gameweek,
         },
     )
 

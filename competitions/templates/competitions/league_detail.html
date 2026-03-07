@@ -16,7 +16,7 @@
   {% if is_admin %}
     <a class="btn" href="{% url 'league_gameweek_create' league.id %}">Create gameweek</a>
   {% endif %}
-  <a class="btn" href="{% url 'pick_matches' league.id %}">Make picks</a>
+  <a class="btn" href="{% url 'pick_matches' league.id %}">Make picks for current gameweek</a>
   </div>
 
     {% if is_admin %}

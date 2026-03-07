@@ -42,17 +42,21 @@
                   <button class="btn" type="submit">Unpublish</button>
                 </form>
               {% else %}
-                <form method="post" action="{% url 'league_gameweek_publish' league.id gw.id %}" style="display:inline;">
-                  {% csrf_token %}
-                  <button class="btn" type="submit">Publish</button>
-                </form>
+                {% if not active_open_gameweek %}
+                  <form method="post" action="{% url 'league_gameweek_publish' league.id gw.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button class="btn" type="submit">Publish</button>
+                  </form>
+                {% endif %}
               {% endif %}
 
               {% if gw.locked %}
-                <form method="post" action="{% url 'league_gameweek_unlock' league.id gw.id %}" style="display:inline;">
-                  {% csrf_token %}
-                  <button class="btn" type="submit">Unlock</button>
-                </form>
+                {% if not active_open_gameweek or active_open_gameweek.id == gw.id %}
+                  <form method="post" action="{% url 'league_gameweek_unlock' league.id gw.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button class="btn" type="submit">Unlock</button>
+                  </form>
+                {% endif %}
               {% else %}
                 <form method="post" action="{% url 'league_gameweek_lock' league.id gw.id %}" style="display:inline;">
                   {% csrf_token %}
@@ -62,6 +66,20 @@
             </div>
           {% endif %}
         </div>
+
+        {% if is_admin %}
+          {% if active_open_gameweek and active_open_gameweek.id != gw.id %}
+            {% if not gw.published %}
+              <div class="muted" style="margin-top:8px;">
+                Cannot publish while {{ active_open_gameweek.name }} is published and open.
+              </div>
+            {% elif gw.locked %}
+              <div class="muted" style="margin-top:8px;">
+                Cannot unlock while {{ active_open_gameweek.name }} is published and open.
+              </div>
+            {% endif %}
+          {% endif %}
+        {% endif %}
       </div>
     {% empty %}
       <p>No gameweeks created yet.</p>
