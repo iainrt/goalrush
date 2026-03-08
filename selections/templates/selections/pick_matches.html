@@ -1,25 +1,96 @@
 {% extends "base.html" %}
+{% load pick_extras %}
 {% block title %}Pick matches{% endblock %}
+
 {% block content %}
+  <style>
+    .fixture-card {
+      margin-bottom: 12px;
+      border: 1px solid #eee;
+    }
+
+    .fixture-card.selectable {
+      cursor: pointer;
+    }
+
+    .fixture-card.taken {
+      opacity: 0.65;
+    }
+
+    .fixture-card.selected {
+      border: 2px solid #111;
+    }
+
+    .status-success {
+      background: #e8f7ed;
+      border: 1px solid #b7e4c7;
+      color: #1b5e20;
+    }
+
+    .status-fail {
+      background: #fdecec;
+      border: 1px solid #f5c2c7;
+      color: #842029;
+    }
+
+    .status-pending {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      color: #333;
+    }
+
+    .submit-disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .submit-enabled {
+      opacity: 1;
+      cursor: pointer;
+    }
+  </style>
+
   <h1>{{ league.name }} - Picks</h1>
   <p class="muted">{{ gameweek.name }} · {{ league.season.name }}</p>
 
   <div class="card">
-    <div><strong>Gameweek window:</strong> {{ gameweek.start_date }} to {{ gameweek.end_date }}</div>
+    <div><strong>Gameweek window:</strong> {{ gameweek.start_date|kickoff_pretty }} to {{ gameweek.end_date|kickoff_pretty }}</div>
     <div class="muted">
       Competitions:
       {% for competition in gameweek.competitions.all %}
         {{ competition.name }}{% if not forloop.last %}, {% endif %}
       {% endfor %}
     </div>
+    <div class="muted" style="margin-top:8px;">
+      Choose exactly 2 matches where you predict both teams will score.
+    </div>
   </div>
 
   <h2>Your picks</h2>
   <div class="card">
     {% for pick in user_picks %}
-      <div>
-        {{ pick.match.home_team.name }} vs {{ pick.match.away_team.name }}
-        <span class="muted">({{ pick.result_status }})</span>
+      <div style="padding:8px 0;border-bottom:1px solid #f1f1f1;">
+        <strong>{{ pick.match.home_team.name }}</strong> vs <strong>{{ pick.match.away_team.name }}</strong>
+
+        <div class="muted">
+          {{ pick.match.competition.name }} · {{ pick.match.kickoff_time|kickoff_pretty }}
+        </div>
+
+        {% if pick.match.home_goals != None and pick.match.away_goals != None %}
+          <div style="margin-top:6px;">
+            <span class="btn">{{ pick.match.home_goals }}-{{ pick.match.away_goals }}</span>
+            <span class="btn">{{ pick.match|match_result_badge }}</span>
+            <span class="btn {% if pick.result_status == 'btts_success' %}status-success{% elif pick.result_status == 'btts_fail' %}status-fail{% else %}status-pending{% endif %}">
+              {{ pick.result_status|pick_status_label }}
+            </span>
+          </div>
+        {% else %}
+          <div style="margin-top:6px;">
+            <span class="btn {% if pick.result_status == 'btts_success' %}status-success{% elif pick.result_status == 'btts_fail' %}status-fail{% else %}status-pending{% endif %}">
+              {{ pick.result_status|pick_status_label }}
+            </span>
+          </div>
+        {% endif %}
       </div>
     {% empty %}
       <p>You have not submitted picks yet.</p>
@@ -27,25 +98,156 @@
   </div>
 
   {% if not user_picks %}
-    <h2>Available matches</h2>
-    <div class="card">
-      <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button class="btn" type="submit">Submit 2 picks</button>
-      </form>
-    </div>
+    <h2>Available fixtures</h2>
+    <form method="post" id="pick-form">
+      {% csrf_token %}
+
+      <div id="selection-count" class="muted" style="margin-bottom:12px;">
+        0 of 2 selected
+      </div>
+
+      {% for competition_name, competition_matches in grouped_matches.items %}
+        <h3 style="margin-top:20px;">{{ competition_name }}</h3>
+
+        {% for match in competition_matches %}
+          <div
+            class="card fixture-card {% if match.id in taken_match_ids %}taken{% else %}selectable{% endif %}"
+            data-match-id="{{ match.id }}"
+            data-selectable="{% if match.id in taken_match_ids %}false{% else %}true{% endif %}"
+          >
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+              <div>
+                <div>
+                  <strong>{{ match.home_team.name }}</strong> vs <strong>{{ match.away_team.name }}</strong>
+                </div>
+                <div class="muted">
+                  {{ match.kickoff_time|kickoff_pretty }}
+                </div>
+              </div>
+
+              <div style="text-align:right;">
+                {% if match.id in user_pick_ids %}
+                  <span class="btn">Your pick</span>
+                {% elif match.id in taken_match_ids %}
+                  <span class="btn">Taken by {{ taken_by_map|get_item:match.id }}</span>
+                {% else %}
+                  <span class="btn">Available</span>
+                {% endif %}
+
+                {% if match.home_goals != None and match.away_goals != None %}
+                  <div style="margin-top:6px;">
+                    <span class="btn">{{ match.home_goals }}-{{ match.away_goals }}</span>
+                    <span class="btn">{{ match|match_result_badge }}</span>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+
+            {% if not match.id in taken_match_ids %}
+              <input
+                type="checkbox"
+                name="match_ids"
+                value="{{ match.id }}"
+                class="match-checkbox"
+                style="display:none;"
+              />
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% empty %}
+        <div class="card">
+          <p>No fixtures available for this gameweek.</p>
+        </div>
+      {% endfor %}
+
+      {% if grouped_matches %}
+        <button class="btn submit-disabled" type="submit" id="submit-button">Submit 2 picks</button>
+      {% endif %}
+    </form>
   {% endif %}
 
   <h2>Other users' picks</h2>
   <div class="card">
     {% for pick in other_picks %}
-      <div style="padding:6px 0;border-bottom:1px solid #f1f1f1;">
+      <div style="padding:8px 0;border-bottom:1px solid #f1f1f1;">
         <strong>{{ pick.user.username }}</strong>
         — {{ pick.match.home_team.name }} vs {{ pick.match.away_team.name }}
+
+        <div class="muted">
+          {{ pick.match.competition.name }} · {{ pick.match.kickoff_time|kickoff_pretty }}
+        </div>
+
+        {% if pick.match.home_goals != None and pick.match.away_goals != None %}
+          <div style="margin-top:6px;">
+            <span class="btn">{{ pick.match.home_goals }}-{{ pick.match.away_goals }}</span>
+            <span class="btn">{{ pick.match|match_result_badge }}</span>
+            <span class="btn {% if pick.result_status == 'btts_success' %}status-success{% elif pick.result_status == 'btts_fail' %}status-fail{% else %}status-pending{% endif %}">
+              {{ pick.result_status|pick_status_label }}
+            </span>
+          </div>
+        {% endif %}
       </div>
     {% empty %}
       <p>No other picks yet.</p>
     {% endfor %}
   </div>
+
+  {% if not user_picks %}
+    <script>
+      (function () {
+        const cards = document.querySelectorAll(".fixture-card");
+        const countEl = document.getElementById("selection-count");
+        const submitButton = document.getElementById("submit-button");
+
+        function getChecked() {
+          return document.querySelectorAll(".match-checkbox:checked");
+        }
+
+        function updateUI() {
+          const checked = getChecked();
+          countEl.textContent = `${checked.length} of 2 selected`;
+
+          cards.forEach((card) => {
+            const checkbox = card.querySelector(".match-checkbox");
+            if (!checkbox) return;
+
+            if (checkbox.checked) {
+              card.classList.add("selected");
+            } else {
+              card.classList.remove("selected");
+            }
+          });
+
+          if (submitButton) {
+            submitButton.disabled = checked.length !== 2;
+            submitButton.classList.toggle("submit-enabled", checked.length === 2);
+            submitButton.classList.toggle("submit-disabled", checked.length !== 2);
+          }
+        }
+
+        cards.forEach((card) => {
+          const selectable = card.dataset.selectable === "true";
+          if (!selectable) return;
+
+          const checkbox = card.querySelector(".match-checkbox");
+          if (!checkbox) return;
+
+          card.addEventListener("click", function (e) {
+            if (e.target.tagName === "INPUT") return;
+
+            const checked = getChecked();
+
+            if (!checkbox.checked && checked.length >= 2) {
+              return;
+            }
+
+            checkbox.checked = !checkbox.checked;
+            updateUI();
+          });
+        });
+
+        updateUI();
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

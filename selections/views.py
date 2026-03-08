@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -6,7 +8,6 @@ from django.shortcuts import get_object_or_404, redirect, render
 from competitions.models import League, LeagueMembership
 from gameweeks.models import Gameweek
 from matches.models import Match
-from .forms import PickMatchesForm
 from .models import Pick
 from .services import PickService
 
@@ -38,15 +39,23 @@ def pick_matches(request, league_id):
     user_picks = (
         Pick.objects
         .filter(user=request.user, league=league, gameweek=gameweek)
-        .select_related("match", "match__home_team", "match__away_team")
+        .select_related("user", "match", "match__home_team", "match__away_team", "match__competition")
+        .order_by("created_at")
     )
 
-    taken_match_ids = Pick.objects.filter(
-        league=league,
-        gameweek=gameweek,
-    ).values_list("match_id", flat=True)
+    all_picks = (
+        Pick.objects
+        .filter(league=league, gameweek=gameweek)
+        .select_related("user", "match", "match__home_team", "match__away_team", "match__competition")
+    )
 
-    available_matches = (
+    taken_match_ids = set(all_picks.values_list("match_id", flat=True))
+    user_pick_ids = set(user_picks.values_list("match_id", flat=True))
+
+    # match_id -> username
+    taken_by_map = {pick.match_id: pick.user.username for pick in all_picks}
+
+    matches = (
         Match.objects
         .filter(
             season=league.season,
@@ -54,41 +63,62 @@ def pick_matches(request, league_id):
             kickoff_time__gte=gameweek.start_date,
             kickoff_time__lte=gameweek.end_date,
         )
-        .exclude(id__in=taken_match_ids)
         .select_related("home_team", "away_team", "competition")
-        .order_by("kickoff_time")
+        .order_by("competition__name", "kickoff_time")
     )
 
+    grouped_matches = OrderedDict()
+    for match in matches:
+        competition_name = match.competition.name
+        grouped_matches.setdefault(competition_name, []).append(match)
+
     other_picks = (
-        Pick.objects
-        .filter(league=league, gameweek=gameweek)
+        all_picks
         .exclude(user=request.user)
-        .select_related("user", "match", "match__home_team", "match__away_team")
         .order_by("created_at")
     )
 
-    form = PickMatchesForm(
-        request.POST or None,
-        available_matches=available_matches,
-    )
-
     if request.method == "POST":
+        selected_ids = request.POST.getlist("match_ids")
+
         if user_picks.exists():
             messages.error(request, "You have already submitted picks for this gameweek.")
             return redirect("pick_matches", league_id=league.id)
 
-        if form.is_valid():
-            try:
-                PickService.create_two_picks(
-                    user=request.user,
-                    league=league,
-                    gameweek=gameweek,
-                    matches=form.cleaned_data["match_ids"],
-                )
-                messages.success(request, "Your picks have been submitted.")
-                return redirect("pick_matches", league_id=league.id)
-            except (ValidationError, ValueError) as e:
-                messages.error(request, str(e))
+        if len(selected_ids) != 2:
+            messages.error(request, "You must choose exactly 2 matches.")
+            return redirect("pick_matches", league_id=league.id)
+
+        matches = list(
+            Match.objects.filter(
+                id__in=selected_ids,
+                season=league.season,
+                competition__in=gameweek.competitions.all(),
+                kickoff_time__gte=gameweek.start_date,
+                kickoff_time__lte=gameweek.end_date,
+            )
+        )
+
+        if len(matches) != 2:
+            messages.error(request, "Invalid matches selected.")
+            return redirect("pick_matches", league_id=league.id)
+
+        if any(match.id in taken_match_ids for match in matches):
+            messages.error(request, "One or more selected matches have already been taken.")
+            return redirect("pick_matches", league_id=league.id)
+
+        try:
+            PickService.create_two_picks(
+                user=request.user,
+                league=league,
+                gameweek=gameweek,
+                matches=matches,
+            )
+            messages.success(request, "Your picks have been submitted.")
+            return redirect("pick_matches", league_id=league.id)
+        except (ValidationError, ValueError) as e:
+            messages.error(request, str(e))
+            return redirect("pick_matches", league_id=league.id)
 
     return render(
         request,
@@ -96,9 +126,11 @@ def pick_matches(request, league_id):
         {
             "league": league,
             "gameweek": gameweek,
-            "form": form,
-            "available_matches": available_matches,
+            "grouped_matches": grouped_matches,
             "user_picks": user_picks,
             "other_picks": other_picks,
+            "taken_match_ids": taken_match_ids,
+            "user_pick_ids": user_pick_ids,
+            "taken_by_map": taken_by_map,
         },
     )
